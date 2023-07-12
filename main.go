@@ -7,7 +7,10 @@ import "net/http"
 func main(){
 	//server
 	mux := http.NewServeMux()
+	// adding handler to mux
+	mux.Handle("/", http.FileServer(http.Dir(".")))
 	corsMux := middlewareCors(mux)
+
 
 	http.ListenAndServe(":8080", corsMux)
 }
@@ -17,9 +20,10 @@ func middlewareCors(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
+		
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
-			return
+			return 
 		}
 		next.ServeHTTP(w, r)
 	})
