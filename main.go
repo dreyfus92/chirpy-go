@@ -7,8 +7,10 @@ import "net/http"
 func main(){
 	//server
 	mux := http.NewServeMux()
-	// adding handler to mux
+	// adding handlers
 	mux.Handle("/", http.FileServer(http.Dir(".")))
+	mux.Handle("/assets", http.FileServer(http.Dir("./assets")))
+
 	corsMux := middlewareCors(mux)
 
 
