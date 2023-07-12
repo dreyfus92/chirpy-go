@@ -1,32 +1,40 @@
 package main
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 
 
 func main(){
-	//server
-	mux := http.NewServeMux()
-	// adding handlers
-	mux.Handle("/", http.FileServer(http.Dir(".")))
-	mux.Handle("/assets", http.FileServer(http.Dir("./assets")))
+	filepathRoot := "./"
+	port := "8080"
 
+	//initializing mux
+	mux := http.NewServeMux()
+
+	// adding handlers
+	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+	mux.HandleFunc("/healthz", handlerReadiness)
+
+	//applying middleware
 	corsMux := middlewareCors(mux)
 
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: corsMux,
+	}
 
-	http.ListenAndServe(":8080", corsMux)
+	log.Printf("Server started on port %s", port)
+	log.Printf("Serving files from %s\n", filepathRoot)
+
+	log.Fatal(srv.ListenAndServe())
+
 }
 
-func middlewareCors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return 
-		}
-		next.ServeHTTP(w, r)
-	})
+func handlerReadiness(w http.ResponseWriter, r *http.Request){
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
