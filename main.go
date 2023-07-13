@@ -15,7 +15,6 @@ func main(){
 		fileserverHits: 0,
 	}
 
-	// mux := http.NewServeMux()
 	r := chi.NewRouter()
 
 	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
