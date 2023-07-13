@@ -25,6 +25,8 @@ func main(){
 	r.Handle("/app", fsHandler)
 
 	api.Get("/healthz", handlerReadiness)
+	api.Post("/validate_chirp", handlerValidateChirp)
+	
 	admin.Get("/metrics", apiCfg.handlerMetrics)
 	
 	r.Mount("/api", api)
