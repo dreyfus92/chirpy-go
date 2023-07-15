@@ -12,7 +12,8 @@ type paramsValidateChirp struct {
 }
 
 type returnVals struct{
-	CleanedBody string `json:"cleaned_body"`
+	Id string `json:"id"`
+	Body string `json:"body"`
 }
 
 var profanities = []string{
@@ -45,7 +46,8 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request){
 	cleaned_body := cleanProfanities(chirp.Body)
 
 	respondWithJSON(w, http.StatusOK, returnVals{
-		CleanedBody: cleaned_body,
+		Id: "1234",
+		Body: cleaned_body,
 	})
 }
 

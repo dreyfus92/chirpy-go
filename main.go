@@ -4,15 +4,22 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/dreyfus92/chirpy-go/internal/database"
 	"github.com/go-chi/chi/v5"
 )
 
-func main(){
+func main() {
 	filepathRoot := "."
 	port := "8080"
 
 	apiCfg := &apiConfig{
 		fileserverHits: 0,
+	}
+
+	_, err := database.NewDB(filepathRoot + "/database.json")
+
+	if err != nil {
+		log.Fatalf("Error creating database: %v", err)
 	}
 
 	r := chi.NewRouter()
@@ -25,15 +32,14 @@ func main(){
 	r.Handle("/app", fsHandler)
 
 	api.Get("/healthz", handlerReadiness)
-	api.Post("/validate_chirp", handlerValidateChirp)
-	
+	api.Post("/chirps", handlerValidateChirp)
+
 	admin.Get("/metrics", apiCfg.handlerMetrics)
-	
+
 	r.Mount("/api", api)
 	r.Mount("/admin", admin)
 
 	corsMux := middlewareCors(r)
-
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -46,5 +52,3 @@ func main(){
 	log.Fatal(srv.ListenAndServe())
 
 }
-
-
