@@ -14,9 +14,9 @@ type apiConfig struct {
 }
 
 func main() {
-	filepathRoot := "."
-	port := "8080"
-	databaseFile := "database.json"
+	const filepathRoot = "."
+	const port = "8080"
+	const databaseFile = "database.json"
 
 	//create the DB
 	db, err := database.NewDB(filepathRoot + "/" + databaseFile)
@@ -45,6 +45,8 @@ func main() {
 
 	// read all chirps
 	api.Get("/chirps", apiCfg.getChirpsHandler)
+	// read a single chirp
+	api.Get("/chirps/{id}", apiCfg.getChirpHandler)
 
 	admin.Get("/metrics", apiCfg.handlerMetrics)
 
