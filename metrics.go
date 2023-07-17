@@ -5,12 +5,7 @@ import (
 	"net/http"
 )
 
-
-type apiConfig struct {
-	fileserverHits int
-}
-
-
+// metrics - counting landing page server hits
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

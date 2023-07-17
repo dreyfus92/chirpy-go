@@ -8,18 +8,25 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type apiConfig struct {
+	fileserverHits int
+	db             *database.DB
+}
+
 func main() {
 	filepathRoot := "."
 	port := "8080"
+	databaseFile := "database.json"
+
+	//create the DB
+	db, err := database.NewDB(filepathRoot + "/" + databaseFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	apiCfg := &apiConfig{
 		fileserverHits: 0,
-	}
-
-	_, err := database.NewDB(filepathRoot + "/database.json")
-
-	if err != nil {
-		log.Fatalf("Error creating database: %v", err)
+		db:             db,
 	}
 
 	r := chi.NewRouter()
@@ -31,8 +38,13 @@ func main() {
 	r.Handle("/app/*", fsHandler)
 	r.Handle("/app", fsHandler)
 
-	api.Get("/healthz", handlerReadiness)
-	api.Post("/chirps", handlerValidateChirp)
+	api.Get("/healthz", readinessHandler)
+
+	// create new chirps
+	api.Post("/chirps", apiCfg.createChirpHandler)
+
+	// read all chirps
+	api.Get("/chirps", apiCfg.getChirpsHandler)
 
 	admin.Get("/metrics", apiCfg.handlerMetrics)
 

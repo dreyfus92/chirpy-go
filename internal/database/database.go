@@ -3,140 +3,162 @@ package database
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"sort"
 	"sync"
 )
 
 type DB struct {
-	path string
-	mux  *sync.RWMutex
+	path   string
+	mux    *sync.RWMutex
+	Chirps map[int]Chirp `json:"chirps"`
 }
 
 type Chirp struct {
-	Id   string `json:"id"`
+	Id   int    `json:"id"`
 	Body string `json:"body"`
 }
 
-type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-}
+/*
+	DB Functions:
+	- NewDB
+	- loadDB
+	- writeDB
+	- GetChirp
+	- GetChirps
+	- CreateChirp
+*/
 
 // NewDB creates a new database connection
 // and creates the database file if it doesn't exist
 
 func NewDB(path string) (*DB, error) {
-	db := &DB{
-		path: path,
-		mux:  &sync.RWMutex{},
-	}
-
-	err := db.ensureDB()
-
+	// If the json doesn't exist, create it, or append to the file
+	_, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		log.Fatal(err)
 		return nil, err
 	}
 
-	return db, nil
-}
-
-// ensureDB creates a new database file if it doesn't exist
-
-func (db *DB) ensureDB() error {
-	_, err := os.ReadFile(db.path)
-
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("Creating new database at %s\n", db.path)
-			err = os.WriteFile(db.path, []byte(`{"chirps":{}}`), 0644)
-			if err != nil {
-				return err
-			}
-		}
+	// create new DB struct
+	db := DB{
+		path:   path,
+		mux:    &sync.RWMutex{},
+		Chirps: make(map[int]Chirp),
 	}
-	return nil
+
+	// load the JSON file contents into memory
+	db.loadDB()
+
+	return &db, nil
 }
 
 // loadDB reads the database file into memory
 
-func (db *DB) loadDB() (DBStructure, error) {
+func (db *DB) loadDB() error {
+	// lock for readers
 	db.mux.RLock()
 	defer db.mux.RUnlock()
 
-	dat, err := os.ReadFile(db.path)
-	if err != nil {
-		return DBStructure{}, err
-	}
-
-	dbStruct := DBStructure{}
-	err = json.Unmarshal(dat, &dbStruct)
-
-	if err != nil {
-		return DBStructure{}, err
-	}
-
-	return dbStruct, nil
-
-}
-
-// writeDB writes the database file to disk
-func (db *DB) writeDB(dbStructure DBStructure) error {
-	db.mux.Lock()
-	defer db.mux.Unlock()
-
-	json, err := json.Marshal(dbStructure)
-
+	//get the JSON from the file, decode into the db.Chirps struct
+	// Open file for reading
+	file, err := os.Open(db.path)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	err = os.WriteFile(db.path, json, 0644)
-	if err != nil {
+	// Decode JSON into DB.Chirps struct
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&db.Chirps); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// writeDB writes the database file to disk
+func (db *DB) writeDB() error {
+	// get the JSON file contents
+	file, err := os.OpenFile(db.path, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// write the Chirps map to the JSON file
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(db.Chirps); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetChirp returns a SINGLE chirp from the database when given an ID
+func (db *DB) GetChirp(id int) (Chirp, error) {
+	// lock for readers
+	db.mux.RLock()
+	defer db.mux.RUnlock()
+
+	chirp, ok := db.Chirps[id]
+
+	if !ok {
+		return Chirp{}, fmt.Errorf("chirp with id %d not found", id)
+	}
+
+	return chirp, nil
 }
 
 //GetChirps returns all chirps from the database
 
 func (db *DB) GetChirps() ([]Chirp, error) {
-	dbStruct, err := db.loadDB()
+	// lock for readers
+	db.mux.RLock()
+	defer db.mux.RUnlock()
 
-	if err != nil {
-		return nil, err
-	}
-
+	//get all chirps
 	chirps := []Chirp{}
-
-	for _, chirp := range dbStruct.Chirps {
-		chirps = append(chirps, chirp)
+	for key := range db.Chirps {
+		chirps = append(chirps, db.Chirps[key])
 	}
+
+	// sort slice of Chirp objects by ID
+	sort.Slice(chirps, func(i, j int) bool {
+		return chirps[i].Id < chirps[j].Id
+	})
 
 	return chirps, nil
 }
 
 // CreateChirp creates a new chirp and saves it to disk
 
-func (db *DB) CreateChirp(body string) (Chirp, error) {
-	dbStruct, err := db.loadDB()
+func (db *DB) CreateChirp(body string) int {
+	// lock for writers
+	db.mux.Lock()
+	defer db.mux.Unlock()
 
-	if err != nil {
-		return Chirp{}, err
+	// get next ID
+	maxKey := 0
+	for key := range db.Chirps {
+		if key > maxKey {
+			maxKey = key
+		}
 	}
+	newKey := maxKey + 1
 
-	id := len(dbStruct.Chirps) + 1
-	chirp := Chirp{
-		Id:   fmt.Sprintf("%d", id),
+	// create the chirp and add it to the db
+	db.Chirps[newKey] = Chirp{
+		Id:   newKey,
 		Body: body,
 	}
 
-	dbStruct.Chirps[id] = chirp
+	// write the db to disk
+	db.writeDB()
 
-	err = db.writeDB(dbStruct)
-
-	if err != nil {
-		return Chirp{}, err
-	}
-
-	return chirp, nil
+	// return the new chirp
+	return newKey
 }
