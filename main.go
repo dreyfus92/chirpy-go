@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/dreyfus92/chirpy-go/internal/database"
 	"github.com/go-chi/chi/v5"
@@ -17,6 +20,15 @@ func main() {
 	const filepathRoot = "."
 	const port = "8080"
 	const databaseFile = "database.json"
+
+	//flag to delete the database file when debugging
+	dbg := flag.Bool("debug", false, "enable debug mode")
+	flag.Parse()
+
+	if *dbg {
+		fmt.Printf("Debug mode enabled, deleting database file \n")
+		os.Remove(filepathRoot + "/" + databaseFile)
+	}
 
 	//create the DB
 	db, err := database.NewDB(filepathRoot + "/" + databaseFile)
@@ -47,6 +59,9 @@ func main() {
 	api.Get("/chirps", apiCfg.getChirpsHandler)
 	// read a single chirp
 	api.Get("/chirps/{id}", apiCfg.getChirpHandler)
+
+	// create new users
+	api.Post("/users", apiCfg.createUserHandler)
 
 	admin.Get("/metrics", apiCfg.handlerMetrics)
 

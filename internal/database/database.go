@@ -10,9 +10,9 @@ import (
 )
 
 type DB struct {
-	path   string
-	mux    *sync.RWMutex
-	Chirps map[int]Chirp `json:"chirps"`
+	path     string
+	mux      *sync.RWMutex
+	dbstruct *DBStructure
 }
 
 type Chirp struct {
@@ -20,14 +20,25 @@ type Chirp struct {
 	Body string `json:"body"`
 }
 
+type User struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+}
+
+type DBStructure struct {
+	Chirps map[int]Chirp `json:"chirps"`
+	Users  map[int]User  `json:"users"`
+}
+
 /*
-	DB Functions:
+	database functions:
 	- NewDB
 	- loadDB
 	- writeDB
 	- GetChirp
 	- GetChirps
 	- CreateChirp
+	- CreateUser
 */
 
 // NewDB creates a new database connection
@@ -41,11 +52,16 @@ func NewDB(path string) (*DB, error) {
 		return nil, err
 	}
 
-	// create new DB struct
-	db := DB{
-		path:   path,
-		mux:    &sync.RWMutex{},
+	dbStruct := DBStructure{
 		Chirps: make(map[int]Chirp),
+		Users:  make(map[int]User),
+	}
+
+	// create a new DB struct
+	db := DB{
+		path:     path,
+		mux:      &sync.RWMutex{},
+		dbstruct: &dbStruct,
 	}
 
 	// load the JSON file contents into memory
@@ -69,9 +85,9 @@ func (db *DB) loadDB() error {
 	}
 	defer file.Close()
 
-	// Decode JSON into DB.Chirps struct
+	// Decode JSON into db.dbstruct struct
 	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&db.Chirps); err != nil {
+	if err := decoder.Decode(&db.dbstruct); err != nil {
 		return err
 	}
 
@@ -91,7 +107,7 @@ func (db *DB) writeDB() error {
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(db.Chirps); err != nil {
+	if err := encoder.Encode(db.dbstruct.Chirps); err != nil {
 		return err
 	}
 
@@ -104,7 +120,7 @@ func (db *DB) GetChirp(id int) (Chirp, error) {
 	db.mux.RLock()
 	defer db.mux.RUnlock()
 
-	chirp, ok := db.Chirps[id]
+	chirp, ok := db.dbstruct.Chirps[id]
 
 	if !ok {
 		return Chirp{}, fmt.Errorf("chirp with id %d not found", id)
@@ -122,8 +138,8 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 
 	//get all chirps
 	chirps := []Chirp{}
-	for key := range db.Chirps {
-		chirps = append(chirps, db.Chirps[key])
+	for key := range db.dbstruct.Chirps {
+		chirps = append(chirps, db.dbstruct.Chirps[key])
 	}
 
 	// sort slice of Chirp objects by ID
@@ -143,7 +159,7 @@ func (db *DB) CreateChirp(body string) int {
 
 	// get next ID
 	maxKey := 0
-	for key := range db.Chirps {
+	for key := range db.dbstruct.Chirps {
 		if key > maxKey {
 			maxKey = key
 		}
@@ -151,7 +167,7 @@ func (db *DB) CreateChirp(body string) int {
 	newKey := maxKey + 1
 
 	// create the chirp and add it to the db
-	db.Chirps[newKey] = Chirp{
+	db.dbstruct.Chirps[newKey] = Chirp{
 		Id:   newKey,
 		Body: body,
 	}
@@ -160,5 +176,33 @@ func (db *DB) CreateChirp(body string) int {
 	db.writeDB()
 
 	// return the new chirp
+	return newKey
+}
+
+// Creating a new user
+func (db *DB) CreateUser(email string) int {
+	// lock for writers
+	db.mux.Lock()
+	defer db.mux.Unlock()
+
+	// get new ID
+	maxKey := 0
+	for key := range db.dbstruct.Users {
+		if key > maxKey {
+			maxKey = key
+		}
+	}
+	newKey := maxKey + 1
+
+	// create the user and add it to the db
+	db.dbstruct.Users[newKey] = User{
+		Id:    newKey,
+		Email: email,
+	}
+
+	// write the db to disk
+	db.writeDB()
+
+	// return the new user
 	return newKey
 }
