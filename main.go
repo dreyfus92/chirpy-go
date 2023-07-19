@@ -2,10 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/dreyfus92/chirpy-go/internal/database"
 	"github.com/go-chi/chi/v5"
@@ -13,71 +11,59 @@ import (
 
 type apiConfig struct {
 	fileserverHits int
-	db             *database.DB
+	DB             *database.DB
 }
 
 func main() {
 	const filepathRoot = "."
 	const port = "8080"
-	const databaseFile = "database.json"
 
-	//flag to delete the database file when debugging
-	dbg := flag.Bool("debug", false, "enable debug mode")
-	flag.Parse()
-
-	if *dbg {
-		fmt.Printf("Debug mode enabled, deleting database file \n")
-		os.Remove(filepathRoot + "/" + databaseFile)
-	}
-
-	//create the DB
-	db, err := database.NewDB(filepathRoot + "/" + databaseFile)
+	db, err := database.NewDB("database.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	apiCfg := &apiConfig{
-		fileserverHits: 0,
-		db:             db,
+	dbg := flag.Bool("debug", false, "Enable debug mode")
+	flag.Parse()
+	if dbg != nil && *dbg {
+		err := db.ResetDB()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	r := chi.NewRouter()
-	api := chi.NewRouter()
-	admin := chi.NewRouter()
+	apiCfg := apiConfig{
+		fileserverHits: 0,
+		DB:             db,
+	}
 
+	router := chi.NewRouter()
 	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	router.Handle("/app", fsHandler)
+	router.Handle("/app/*", fsHandler)
 
-	r.Handle("/app/*", fsHandler)
-	r.Handle("/app", fsHandler)
+	apiRouter := chi.NewRouter()
+	apiRouter.Get("/healthz", handlerReadiness)
 
-	api.Get("/healthz", readinessHandler)
+	apiRouter.Post("/login", apiCfg.handlerLogin)
+	apiRouter.Post("/users", apiCfg.handlerUsersCreate)
 
-	// create new chirps
-	api.Post("/chirps", apiCfg.createChirpHandler)
+	apiRouter.Post("/chirps", apiCfg.handlerChirpsCreate)
+	apiRouter.Get("/chirps", apiCfg.handlerChirpsRetrieve)
+	apiRouter.Get("/chirps/{chirpID}", apiCfg.handlerChirpsGet)
+	router.Mount("/api", apiRouter)
 
-	// read all chirps
-	api.Get("/chirps", apiCfg.getChirpsHandler)
-	// read a single chirp
-	api.Get("/chirps/{id}", apiCfg.getChirpHandler)
+	adminRouter := chi.NewRouter()
+	adminRouter.Get("/metrics", apiCfg.handlerMetrics)
+	router.Mount("/admin", adminRouter)
 
-	// create new users
-	api.Post("/users", apiCfg.createUserHandler)
-
-	admin.Get("/metrics", apiCfg.handlerMetrics)
-
-	r.Mount("/api", api)
-	r.Mount("/admin", admin)
-
-	corsMux := middlewareCors(r)
+	corsMux := middlewareCors(router)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: corsMux,
 	}
 
-	log.Printf("Server started on port %s", port)
-	log.Printf("Serving files from %s\n", filepathRoot)
-
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(srv.ListenAndServe())
-
 }
