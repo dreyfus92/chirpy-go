@@ -21,11 +21,11 @@ func main() {
 	const filepathRoot = "."
 	const port = "8080"
 
-	godotenv.Load()
+	godotenv.Load(".env")
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET environment variable does not exist")
+		log.Fatal("JWT_SECRET environment variable is not set")
 	}
 
 	db, err := database.NewDB("database.json")
@@ -56,6 +56,8 @@ func main() {
 	apiRouter := chi.NewRouter()
 	apiRouter.Get("/healthz", handlerReadiness)
 
+	apiRouter.Post("/revoke", apiCfg.handlerRevoke)
+	apiRouter.Post("/refresh", apiCfg.handlerRefresh)
 	apiRouter.Post("/login", apiCfg.handlerLogin)
 
 	apiRouter.Post("/users", apiCfg.handlerUsersCreate)

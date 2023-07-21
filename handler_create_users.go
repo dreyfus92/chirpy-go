@@ -10,7 +10,7 @@ import (
 )
 
 type User struct {
-	Id       int    `json:"Id"`
+	ID       int    `json:"Id"`
 	Email    string `json:"email"`
 	Password string `json:"-"`
 }
@@ -51,7 +51,7 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 
 	respondWithJSON(w, http.StatusCreated, response{
 		User: User{
-			Id:    user.Id,
+			ID:    user.ID,
 			Email: user.Email,
 		},
 	})

@@ -1,11 +1,9 @@
 package database
 
-import (
-	"errors"
-)
+import "errors"
 
 type User struct {
-	Id             int    `json:"id"`
+	ID             int    `json:"id"`
 	Email          string `json:"email"`
 	HashedPassword string `json:"hashed_password"`
 }
@@ -24,7 +22,7 @@ func (db *DB) CreateUser(email, hashedPassword string) (User, error) {
 
 	id := len(dbStructure.Users) + 1
 	user := User{
-		Id:             id,
+		ID:             id,
 		Email:          email,
 		HashedPassword: hashedPassword,
 	}

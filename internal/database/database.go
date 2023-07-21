@@ -13,8 +13,9 @@ type DB struct {
 }
 
 type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]User  `json:"users"`
+	Chirps      map[int]Chirp         `json:"chirps"`
+	Users       map[int]User          `json:"users"`
+	Revocations map[string]Revocation `json:"revocations"`
 }
 
 var ErrNotExist = errors.New("resource does not exist")
